@@ -1,0 +1,15 @@
+# Frontend Dependencies
+node_modules/
+
+# Production build artifacts
+dist/
+
+# Environment variables (CRITICAL - NEVER COMMIT)
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Logs
+*.log
+npm-debug.log*

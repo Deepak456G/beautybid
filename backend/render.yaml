@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: beautybid-api
+    env: node
+    plan: standard
+    region: singapore # Closest region to India for minimal latency
+    buildCommand: npm ci && npm run prisma:deploy && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        sync: false # Set securely in Render dashboard (PostgreSQL connection string with pooling)
+      - key: DIRECT_URL
+        sync: false # Set securely in Render dashboard (Direct PostgreSQL connection string for migrations)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        value: https://beautybid.in
+      - key: RAZORPAY_KEY_ID
+        sync: false # Provide Razorpay Test Key ID (e.g. rzp_test_...)
+      - key: RAZORPAY_KEY_SECRET
+        sync: false # Provide Razorpay Test Key Secret
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false # Provide Razorpay Webhook Secret configured in dashboard
+      - key: DEFAULT_MIN_RANK_INCREMENT
+        value: 500
+      - key: CURRENCY
+        value: INR

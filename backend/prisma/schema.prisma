@@ -1,0 +1,208 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  BRAND
+  ADMIN
+}
+
+enum ProductStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  REJECTED
+}
+
+enum PaymentStatus {
+  created
+  pending
+  authorized
+  captured
+  failed
+  refunded
+}
+
+enum ClickEventType {
+  view
+  card_click
+  external_click
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  role         Role      @default(USER)
+  avatarUrl    String?   @map("avatar_url")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  brands       Brand[]
+  payments     Payment[]
+
+  @@map("users")
+}
+
+model Brand {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  name        String
+  slug        String    @unique
+  logoUrl     String?   @map("logo_url")
+  websiteUrl  String?   @map("website_url")
+  description String?
+  verified    Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products    Product[]
+  payments    Payment[]
+
+  @@map("brands")
+}
+
+model Category {
+  id           String    @id @default(uuid())
+  name         String    @unique
+  slug         String    @unique
+  description  String?
+  icon         String?
+  displayOrder Int       @default(0) @map("display_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  products     Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id             String         @id @default(uuid())
+  brandId        String         @map("brand_id")
+  categoryId     String         @map("category_id")
+  name           String
+  slug           String         @unique
+  description    String
+  productUrl     String         @map("product_url")
+  imageUrl       String         @map("image_url")
+  verifiedSpend  Decimal        @default(0.00) @map("verified_spend") @db.Decimal(12, 2)
+  status         ProductStatus  @default(ACTIVE)
+  isFeatured     Boolean        @default(false) @map("is_featured")
+  viewsCount     Int            @default(0) @map("views_count")
+  clicksCount    Int            @default(0) @map("clicks_count")
+  lastPromotedAt DateTime?      @map("last_promoted_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  brand          Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  category       Category       @relation(fields: [categoryId], references: [id])
+  payments       Payment[]
+  rankingHistory RankingHistory[]
+  clickEvents    ClickEvent[]
+
+  @@index([verifiedSpend(sort: Desc), lastPromotedAt(sort: Asc)])
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("products")
+}
+
+model Payment {
+  id               String        @id @default(uuid())
+  productId        String        @map("product_id")
+  brandId          String        @map("brand_id")
+  userId           String        @map("user_id")
+  amount           Decimal       @db.Decimal(12, 2)
+  currency         String        @default("INR")
+  gateway          String        @default("razorpay")
+  gatewayOrderId   String        @unique @map("gateway_order_id")
+  gatewayPaymentId String?       @unique @map("gateway_payment_id")
+  gatewaySignature String?       @map("gateway_signature")
+  status           PaymentStatus @default(created)
+  targetRank       Int           @map("target_rank")
+  previousSpend    Decimal       @default(0.00) @map("previous_spend") @db.Decimal(12, 2)
+  newSpend         Decimal       @default(0.00) @map("new_spend") @db.Decimal(12, 2)
+  metadata         Json?
+  createdAt        DateTime      @default(now()) @map("created_at")
+  verifiedAt       DateTime?     @map("verified_at")
+
+  product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  brand            Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  user             User          @relation(fields: [userId], references: [id])
+  paymentEvents    PaymentEvent[]
+  rankingHistory   RankingHistory[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([productId])
+  @@index([brandId])
+  @@map("payments")
+}
+
+model PaymentEvent {
+  id          String   @id @default(uuid())
+  paymentId   String?  @map("payment_id")
+  eventId     String   @unique @map("event_id")
+  eventType   String   @map("event_type")
+  payload     Json
+  processedAt DateTime @default(now()) @map("processed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  payment     Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@map("payment_events")
+}
+
+model RankingHistory {
+  id                   String   @id @default(uuid())
+  productId            String   @map("product_id")
+  rank                 Int
+  verifiedSpend        Decimal  @map("verified_spend") @db.Decimal(12, 2)
+  triggeredByPaymentId String?  @map("triggered_by_payment_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  product              Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  payment              Payment? @relation(fields: [triggeredByPaymentId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([createdAt])
+  @@map("ranking_history")
+}
+
+model ClickEvent {
+  id        String         @id @default(uuid())
+  productId String         @map("product_id")
+  eventType ClickEventType @map("event_type")
+  referrer  String?
+  ipHash    String?        @map("ip_hash")
+  userAgent String?        @map("user_agent")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, eventType])
+  @@index([createdAt])
+  @@map("click_events")
+}
+
+model SiteSettings {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
