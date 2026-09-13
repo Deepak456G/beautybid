@@ -16,7 +16,7 @@ COPY package*.json ./
 COPY tsconfig.json ./
 
 # Install all dependencies (including dev dependencies for TypeScript build)
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma
